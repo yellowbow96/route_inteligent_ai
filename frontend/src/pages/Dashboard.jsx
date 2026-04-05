@@ -92,13 +92,13 @@ function Dashboard() {
     if (hr >= 6 && hr < 18) setTheme('light');
     else setTheme('dark');
 
-    axios.get('http://localhost:5000/api/bike')
+    axios.get('http://localhost:8000/api/bike')
       .then(res => { if (res.data) setBike(res.data); else navigate('/profile'); })
       .catch(() => navigate('/profile'));
   }, [navigate]);
 
   useEffect(() => {
-    axios.get(`http://localhost:5000/api/proxy/weather?lat=${currentLocation[0]}&lon=${currentLocation[1]}`)
+    axios.get(`http://localhost:8000/api/proxy/weather?lat=${currentLocation[0]}&lon=${currentLocation[1]}`)
          .then(res => setWeather(res.data)).catch(console.error);
   }, []);
 
@@ -134,15 +134,15 @@ function Dashboard() {
   const planRoute = async () => {
     if (!startQuery || !endQuery) return alert("Enter start and destination");
     try {
-      const startRes = await axios.get(`http://localhost:5000/api/proxy/geocode?query=${startQuery}`);
-      const endRes = await axios.get(`http://localhost:5000/api/proxy/geocode?query=${endQuery}`);
+      const startRes = await axios.get(`http://localhost:8000/api/proxy/geocode?query=${startQuery}`);
+      const endRes = await axios.get(`http://localhost:8000/api/proxy/geocode?query=${endQuery}`);
       
       const startC = startRes.data.features[0].geometry.coordinates;
       const endC = endRes.data.features[0].geometry.coordinates;
 
       const profile = routeType === 'Safe' ? 'driving-car' : routeType === 'Fastest' ? 'driving-car' : 'driving-car';
 
-      const routeRes = await axios.post('http://localhost:5000/api/proxy/route', { coordinates: [startC, endC] });
+      const routeRes = await axios.post('http://localhost:8000/api/proxy/route', { coordinates: [startC, endC] });
       const coords = routeRes.data.features[0].geometry.coordinates.map(c => [c[1], c[0]]);
       const dist = routeRes.data.features[0].properties.summary.distance / 1000;
       
@@ -267,7 +267,7 @@ function Dashboard() {
     const rideData = { date: new Date().toISOString(), distance, duration, average_speed: avgSpeed, fuel_used: fuelUsed, rider_score: score, route_data: routeGeoPath };
 
     try {
-      await axios.post('http://localhost:5000/api/rides', rideData);
+      await axios.post('http://localhost:8000/api/rides', rideData);
       navigate('/summary', { state: { ...rideData, score, aiInsight, tripCost, speedHistory } });
     } catch(err) {
       alert('Failed to save ride');

@@ -3,3 +3,6 @@ dist
 .env
 .sqlite
 .DS_Store
+fastapi_backend/venv/
+**/__pycache__/
+*.pyc

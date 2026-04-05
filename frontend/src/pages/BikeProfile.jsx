@@ -17,7 +17,7 @@ function BikeProfile() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const res = await axios.get('http://localhost:5000/api/bike');
+        const res = await axios.get('http://localhost:8000/api/bike');
         if (res.data) setProfile(res.data);
       } catch (err) {
         console.error(err);
@@ -31,7 +31,7 @@ function BikeProfile() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('http://localhost:5000/api/bike', profile);
+      await axios.post('http://localhost:8000/api/bike', profile);
       setMessage('Profile saved successfully! Redirecting to Dashboard...');
       setTimeout(() => navigate('/'), 1500);
     } catch (err) {

@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+motor
+pymongo
+pyjwt
+httpx
+python-dotenv
+passlib[bcrypt]

@@ -23,7 +23,7 @@ function RideHistory() {
   useEffect(() => {
     const fetchRides = async () => {
       try {
-        const res = await axios.get('http://localhost:5000/api/rides');
+        const res = await axios.get('http://localhost:8000/api/rides');
         setRides(res.data);
       } catch (err) {
         console.error(err);

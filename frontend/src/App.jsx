@@ -3,7 +3,6 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
-import BikeProfile from './pages/BikeProfile';
 import RideSummary from './pages/RideSummary';
 import RideHistory from './pages/RideHistory';
 
