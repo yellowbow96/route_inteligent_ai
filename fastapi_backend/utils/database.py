@@ -4,9 +4,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
+# Using the requested MongoDB Atlas URI from .env
+MONGO_URI = os.getenv("MONGO_URI")
+
+# We use AsyncIOMotorClient because the FastAPI routers use 'await' for all DB operations
 client = AsyncIOMotorClient(MONGO_URI)
-db = client.rider_intelligence
+db = client["riderdb"] 
+
+print("MongoDB Connected 🚀 (Async Mode for FastAPI)")
 
 def get_db():
     return db
