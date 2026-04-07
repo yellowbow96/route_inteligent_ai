@@ -1,7 +1,12 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Share2, ArrowLeft, Navigation, Activity, DollarSign, TrendingDown } from 'lucide-react';
+import {
+  Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip as ChartTooltip
+} from 'chart.js';
 import { Line } from 'react-chartjs-2';
+
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, ChartTooltip);
 
 function RideSummary() {
   const { state } = useLocation();

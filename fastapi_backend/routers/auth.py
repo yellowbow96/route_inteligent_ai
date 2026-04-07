@@ -19,7 +19,8 @@ async def register(user: UserCreate):
     await db.users.insert_one({
         "_id": user_id,
         "username": user.username,
-        "password": hashed_pw
+        "password": hashed_pw,
+        "full_name": user.full_name
     })
     
     token = sign_jwt(user_id)

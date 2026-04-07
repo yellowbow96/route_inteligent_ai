@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: rider-intelligence-backend
+    env: python
+    region: oregon
+    rootDir: fastapi_backend
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET_KEY
+        sync: false

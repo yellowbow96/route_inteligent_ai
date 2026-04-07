@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 function BikeProfile() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState({
-    model: '',
+    model_name: '',
     engine_cc: '',
     weight: '',
     wheel_diameter: '',
@@ -17,7 +17,7 @@ function BikeProfile() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const res = await axios.get('http://localhost:8000/api/bike');
+        const res = await axios.get('/api/bike/');
         if (res.data) setProfile(res.data);
       } catch (err) {
         console.error(err);
@@ -31,11 +31,19 @@ function BikeProfile() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('http://localhost:8000/api/bike', profile);
-      setMessage('Profile saved successfully! Redirecting to Dashboard...');
+      const payload = {
+        model_name: profile.model_name,
+        engine_cc: parseInt(profile.engine_cc),
+        weight: parseInt(profile.weight),
+        wheel_diameter: parseInt(profile.wheel_diameter),
+        tank_capacity: parseInt(profile.tank_capacity)
+      };
+      await axios.post('/api/bike/', payload);
+      setMessage('✅ Profile saved successfully! Redirecting to Dashboard...');
       setTimeout(() => navigate('/'), 1500);
     } catch (err) {
-      setMessage('Error saving profile');
+      console.error(err);
+      setMessage('❌ Error saving profile. Please check if all values are valid.');
     }
   };
 
@@ -57,8 +65,8 @@ function BikeProfile() {
           <div className="md:col-span-2">
             <label className="block text-sm text-gray-400 mb-1">Bike Model Name</label>
             <input type="text" 
-                   value={profile.model} 
-                   onChange={(e) => setProfile({...profile, model: e.target.value})} 
+                   value={profile.model_name} 
+                   onChange={(e) => setProfile({...profile, model_name: e.target.value})} 
                    className="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-white focus:border-neonBlue outline-none focus:ring-1 focus:ring-neonBlue transition-colors"
                    required placeholder="e.g. Yamaha R15 V4" />
           </div>

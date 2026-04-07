@@ -3,6 +3,7 @@
 @theme {
   --color-neon-blue: #00f3ff;
   --color-neon-orange: #ff6b00;
+  --color-neon-green: #39ff14;
 }
 
 @layer base {

@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Request
 from models.ride import RideLog
 from utils.database import get_db
 from routers.bike import get_current_user
+from services.ai_engine import generate_ai_insights
 
 router = APIRouter()
 
@@ -18,6 +19,10 @@ async def save_ride(ride: RideLog, request: Request):
     ride_data = ride.dict()
     ride_data["userId"] = user_id
     
+    # AI Engine integration
+    ai_insight = generate_ai_insights(ride.rider_score, ride.speedHistory, ride.fuel_used)
+    ride_data["aiInsight"] = ai_insight
+
     await db.rides.insert_one(ride_data)
     
     # Update explicitly named Hash Map
@@ -25,7 +30,7 @@ async def save_ride(ride: RideLog, request: Request):
         # Invalidate cache if new data added
         del db_cache[user_id]
         
-    return {"status": "success"}
+    return {"status": "success", "aiInsight": ai_insight}
 
 @router.get("/")
 async def get_rides(request: Request):

@@ -6,6 +6,7 @@ function Login() {
   const [isLogin, setIsLogin] = useState(true);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
   const [error, setError] = useState(null);
   const { login, register } = useAuth();
   const navigate = useNavigate();
@@ -17,7 +18,7 @@ function Login() {
       if (isLogin) {
         await login(username, password);
       } else {
-        await register(username, password);
+        await register(username, password, fullName);
       }
       navigate('/profile');
     } catch (err) {
@@ -32,8 +33,16 @@ function Login() {
       <div className="absolute top-1/3 right-1/4 w-96 h-96 bg-neonOrange/20 rounded-full blur-[100px]" />
       
       <div className="relative z-10 w-full max-w-md p-8 bg-gray-800/80 border border-gray-700/50 rounded-2xl shadow-2xl backdrop-blur-xl">
-        <h2 className="text-3xl font-bold text-center mb-8 bg-gradient-to-r from-neonBlue to-neonOrange text-transparent bg-clip-text">
-          {isLogin ? 'RIDER INTELLIGENCE' : 'JOIN THE RIDE'}
+        <div className="mb-8 text-center">
+          <h1 className="text-5xl font-black font-mono tracking-tighter text-white mb-2">
+            RIDER<span className="text-neonBlue">INTEL</span>
+          </h1>
+          <div className="h-1 w-20 bg-gradient-to-r from-neonBlue to-neonOrange mx-auto rounded-full"></div>
+          <p className="text-gray-400 text-xs mt-4 font-bold tracking-[0.3em] uppercase">V3 Intelligent Systems</p>
+        </div>
+
+        <h2 className="text-xl font-bold text-center mb-8 text-gray-300">
+          {isLogin ? 'MISSION CONTROL LOGIN' : 'RECRUIT NEW RIDER'}
         </h2>
         
         {error && (
@@ -43,6 +52,18 @@ function Login() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {!isLogin && (
+            <div>
+              <label className="block text-sm font-medium text-gray-400 mb-2">Full Name</label>
+              <input
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                className="w-full bg-gray-900/50 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-neonBlue focus:ring-1 focus:ring-neonBlue transition-all"
+                required
+              />
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-2">Username</label>
             <input

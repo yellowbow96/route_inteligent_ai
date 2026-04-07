@@ -1,4 +1,7 @@
 {
+  "scripts": {
+    "build": "cd frontend && npm install && npm run build"
+  },
   "dependencies": {
     "autoprefixer": "^10.4.27",
     "chart.js": "^4.5.1",

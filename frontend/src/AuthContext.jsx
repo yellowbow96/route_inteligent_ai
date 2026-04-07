@@ -5,6 +5,8 @@ const AuthContext = createContext();
 
 export const useAuth = () => useContext(AuthContext);
 
+const API_BASE = '';
+
 export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem('token') || null);
   const [user, setUser] = useState(null);
@@ -22,17 +24,20 @@ export const AuthProvider = ({ children }) => {
   }, [token]);
 
   const login = async (username, password) => {
-    const res = await axios.post('http://localhost:8000/api/auth/login', { username, password });
+    const res = await axios.post(`${API_BASE}/api/auth/login/`, { username, password });
     setToken(res.data.token);
+    localStorage.setItem('username', username);
   };
 
-  const register = async (username, password) => {
-    const res = await axios.post('http://localhost:8000/api/auth/register', { username, password });
+  const register = async (username, password, fullName) => {
+    const res = await axios.post(`${API_BASE}/api/auth/register/`, { username, password, full_name: fullName });
     setToken(res.data.token);
+    localStorage.setItem('username', username);
   };
 
   const logout = () => {
     setToken(null);
+    localStorage.removeItem('username');
   };
 
   return (

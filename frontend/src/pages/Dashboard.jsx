@@ -92,15 +92,47 @@ function Dashboard() {
     if (hr >= 6 && hr < 18) setTheme('light');
     else setTheme('dark');
 
-    axios.get('http://localhost:8000/api/bike')
-      .then(res => { if (res.data) setBike(res.data); else navigate('/profile'); })
+    // Fetch Bike Profile
+    axios.get('/api/bike/')
+      .then(res => { 
+        if (res.data) setBike(res.data); 
+        else navigate('/profile'); 
+      })
       .catch(() => navigate('/profile'));
+
+    // GPS Geolocation
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition((position) => {
+        const { latitude, longitude } = position.coords;
+        setCurrentLocation([latitude, longitude]);
+        addAlert("🛰️ GPS Signal Locked!", "gps_ok");
+      }, (error) => {
+        console.error("Geolocation error:", error);
+        addAlert("❌ GPS Signal Failed. Using default location.", "gps_fail");
+      });
+    } else {
+      addAlert("❌ Geolocation not supported by your browser.", "gps_unsupported");
+    }
   }, [navigate]);
 
   useEffect(() => {
-    axios.get(`http://localhost:8000/api/proxy/weather?lat=${currentLocation[0]}&lon=${currentLocation[1]}`)
+    axios.get(`/api/proxy/weather?lat=${currentLocation[0]}&lon=${currentLocation[1]}`)
          .then(res => setWeather(res.data)).catch(console.error);
   }, []);
+
+  const locateMe = () => {
+    if ("geolocation" in navigator) {
+      addAlert("🔍 Locating rider...");
+      navigator.geolocation.getCurrentPosition((position) => {
+        const { latitude, longitude } = position.coords;
+        setCurrentLocation([latitude, longitude]);
+        addAlert("🛰️ GPS Signal Locked!", "gps_ok");
+      }, (error) => {
+        console.error("Geolocation error:", error);
+        addAlert("❌ GPS Signal Failed. Please enable location permissions.", "gps_fail");
+      });
+    }
+  };
 
   const triggerHudSuggestion = (msg) => {
     setHudPopover(msg);
@@ -132,17 +164,46 @@ function Dashboard() {
   };
 
   const planRoute = async () => {
-    if (!startQuery || !endQuery) return alert("Enter start and destination");
+    if (!endQuery) return alert("Enter destination");
+    
+    let startLoc = startQuery;
+    if (!startLoc && currentLocation) {
+      // Use coordinates string for geocode if no query provided
+      startLoc = `${currentLocation[1]},${currentLocation[0]}`; 
+    }
+
     try {
-      const startRes = await axios.get(`http://localhost:8000/api/proxy/geocode?query=${startQuery}`);
-      const endRes = await axios.get(`http://localhost:8000/api/proxy/geocode?query=${endQuery}`);
+      addAlert("🗺️ Calculating optimized route...");
       
-      const startC = startRes.data.features[0].geometry.coordinates;
-      const endC = endRes.data.features[0].geometry.coordinates;
+      // Fallback geocoding logic
+      let startC, endC;
+      
+      try {
+        const startRes = await axios.get(`/api/proxy/geocode?query=${encodeURIComponent(startLoc || 'New Delhi')}`);
+        if (startRes.data.features && startRes.data.features.length > 0) {
+            startC = startRes.data.features[0].geometry.coordinates;
+        } else if (currentLocation) {
+            startC = [currentLocation[1], currentLocation[0]];
+        }
+        
+        const endRes = await axios.get(`/api/proxy/geocode?query=${encodeURIComponent(endQuery)}`);
+        if (endRes.data.features && endRes.data.features.length > 0) {
+            endC = endRes.data.features[0].geometry.coordinates;
+        } else {
+            throw new Error("Destination not found");
+        }
+      } catch (err) {
+        console.error("Geocoding failed:", err);
+        alert("Could not find locations. Please try more specific names.");
+        return;
+      }
 
-      const profile = routeType === 'Safe' ? 'driving-car' : routeType === 'Fastest' ? 'driving-car' : 'driving-car';
+      const routeRes = await axios.post('/api/proxy/route/', { coordinates: [startC, endC] });
+      
+      if (!routeRes.data || !routeRes.data.features || routeRes.data.features.length === 0) {
+        throw new Error("No route geometry found in API response");
+      }
 
-      const routeRes = await axios.post('http://localhost:8000/api/proxy/route', { coordinates: [startC, endC] });
       const coords = routeRes.data.features[0].geometry.coordinates.map(c => [c[1], c[0]]);
       const dist = routeRes.data.features[0].properties.summary.distance / 1000;
       
@@ -151,8 +212,13 @@ function Dashboard() {
       setCurrentLocation(coords[0]);
 
       // Calculate stops
-      const eff = (1500 / bike.engine_cc) * (bike.wheel_diameter / bike.weight) * 100;
-      let maxRange = bike.tank_capacity * eff;
+      const engineCc = bike ? parseInt(bike.engine_cc) : 150;
+      const wheelDia = bike ? parseInt(bike.wheel_diameter) : 17;
+      const weightKg = bike ? parseInt(bike.weight) : 150;
+      const tankCap = bike ? parseInt(bike.tank_capacity) : 10;
+
+      const eff = (1500 / engineCc) * (wheelDia / weightKg) * 100;
+      let maxRange = tankCap * eff;
       if (rideMode === 'Eco') maxRange *= 1.2;
       if (rideMode === 'Sport') maxRange *= 0.8;
 
@@ -264,11 +330,12 @@ function Dashboard() {
     else if (score > 70) aiInsight = "Good ride. Consider reducing sudden braking events which cost you fuel efficiency.";
     else aiInsight = "Careful! You had frequent speed violations. The 'Safe' route mode is recommended for your next trip.";
 
-    const rideData = { date: new Date().toISOString(), distance, duration, average_speed: avgSpeed, fuel_used: fuelUsed, rider_score: score, route_data: routeGeoPath };
+    const rideData = { date: new Date().toISOString(), distance, duration, average_speed: avgSpeed, fuel_used: fuelUsed, rider_score: score, route_data: routeGeoPath, speedHistory };
 
     try {
-      await axios.post('http://localhost:8000/api/rides', rideData);
-      navigate('/summary', { state: { ...rideData, score, aiInsight, tripCost, speedHistory } });
+      const res = await axios.post('/api/rides/', rideData);
+      const backendAiInsight = res.data.aiInsight || aiInsight;
+      navigate('/summary', { state: { ...rideData, score, aiInsight: backendAiInsight, tripCost, speedHistory } });
     } catch(err) {
       alert('Failed to save ride');
     }
@@ -292,16 +359,23 @@ function Dashboard() {
       <header className={`${panelBg} border-b p-4 shrink-0 flex justify-between items-center backdrop-blur-md z-50`}>
         <div className="flex items-center">
           <h1 className="text-xl font-bold font-mono text-neonBlue mr-6">RIDER<span className="text-neonOrange">INTEL</span></h1>
+          <button onClick={locateMe} className="text-gray-500 hover:text-neonBlue flex items-center">
+            <MapPin className="w-5 h-5 mr-1" /> Locate
+          </button>
           <button onClick={() => setTheme(isLight ? 'dark' : 'light')} className="text-gray-500 hover:text-neonBlue">
             {isLight ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5"/>}
           </button>
         </div>
         
         <div className="flex items-center space-x-6">
+          <div className="flex flex-col items-end mr-4">
+             <span className="text-[10px] font-bold opacity-50 uppercase tracking-widest">Active Rider</span>
+             <span className="text-sm font-black text-white">{localStorage.getItem('username') || 'Tester'}</span>
+          </div>
           <button onClick={() => setShowSOS(true)} className="flex items-center text-red-500 font-bold bg-red-500/10 px-3 py-1 rounded-full hover:bg-red-500/20 animate-pulse">
             <PhoneCall className="w-4 h-4 mr-2" /> SOS
           </button>
-          {weather && (
+          {weather && weather.main && weather.weather && weather.weather.length > 0 && (
             <div className={`flex items-center ${isLight?'text-gray-600':'text-gray-300'}`}>
               <span className="text-neonOrange mr-2 font-bold">{weather.main.temp}°C</span>
               <span className="text-sm">{weather.weather[0].main}</span>
@@ -334,7 +408,7 @@ function Dashboard() {
             </div>
 
             <div className="flex items-center space-x-3">
-              <label className="text-xs font-bold flex items-center opacity-70"><DollarSign className="w-3 h-3"/> Fuel Price / L</label>
+              <label className="text-xs font-bold flex items-center opacity-70">₹ Fuel Price / L</label>
               <input type="number" value={fuelPrice} onChange={e=>setFuelPrice(e.target.value)} className="bg-transparent border-b border-gray-500 w-16 text-sm text-center outline-none focus:border-neonBlue"/>
             </div>
           </div>
@@ -396,12 +470,23 @@ function Dashboard() {
              ))}
           </div>
 
-          <MapContainer center={currentLocation} zoom={15} zoomControl={false} className="flex-1 w-full bg-[#1a1c23]">
+          <MapContainer center={currentLocation} zoom={15} zoomControl={false} className="flex-1 w-full bg-[#1a1c23]" style={{ height: '100%', minHeight: '400px' }}>
             <MapMover center={currentLocation} zoom={isSimulating ? 16 : 14} heading={heading} />
             <TileLayer
               url={isLight ? "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"}
             />
-            {routeGeoPath.length > 0 && <Polyline positions={routeGeoPath} color={routeType==='Fastest'?'#ff6b00':'#00f3ff'} weight={6} opacity={0.8} />}
+            {routeGeoPath.length > 0 && <Polyline positions={routeGeoPath} color={routeType==='Fastest'?'#ff6b00':routeType==='Safe'?'#39ff14':'#00f3ff'} weight={6} opacity={0.8} />}
+            {plannedStops.map((stop, i) => (
+              <Marker key={`stop-${i}`} position={stop.coords}>
+                <Popup>
+                  <div className="text-xs font-bold">
+                    <span className={stop.type === 'Fuel' ? 'text-neonOrange' : 'text-neonBlue'}>{stop.type} Stop</span>
+                    <br />
+                    {stop.label}
+                  </div>
+                </Popup>
+              </Marker>
+            ))}
             <Marker position={currentLocation} icon={createRiderIcon(heading, getSpeedColor())} zIndexOffset={1000} />
           </MapContainer>
           
