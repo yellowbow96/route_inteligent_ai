@@ -22,10 +22,31 @@ async def weather_proxy(lat: float, lon: float):
 
 @router.get("/geocode")
 async def geocode_proxy(query: str):
-    url = f"https://api.openrouteservice.org/geocode/search?api_key={ORS_KEY}&text={urllib.parse.quote(query)}"
+    # Using OpenStreetMap Nominatim API as requested for better optimal path finding
+    url = f"https://nominatim.openstreetmap.org/search?q={urllib.parse.quote(query)}&format=json&limit=1"
+    headers = {"User-Agent": "RiderIntel/1.0"} # Nominatim requires a User-Agent
+    
     async with httpx.AsyncClient() as client:
-        res = await client.get(url)
-        return res.json()
+        res = await client.get(url, headers=headers)
+        data = res.json()
+        
+        # Convert Nominatim format to GeoJSON format expected by frontend
+        if data and len(data) > 0:
+            lon = float(data[0]["lon"])
+            lat = float(data[0]["lat"])
+            return {
+                "features": [
+                    {
+                        "geometry": {
+                            "coordinates": [lon, lat]
+                        },
+                        "properties": {
+                            "name": data[0].get("display_name")
+                        }
+                    }
+                ]
+            }
+        return {"features": []}
 
 @router.post("/route")
 async def route_proxy(payload: dict):
@@ -63,18 +84,30 @@ async def route_proxy(payload: dict):
 @router.post("/pois")
 async def pois_proxy(payload: dict):
     import random
+    lat = payload.get("lat", 28.6139)
+    lon = payload.get("lon", 77.209)
+    
     mock_places = []
-    names = ["Highway Dhaba", "Fuel Station (HP)", "ATM Center", "Rest Area Motel"]
-    for i in range(10):
+    names = ["Highway Dhaba", "Fuel Station (HP)", "ATM Center", "Rest Area Motel", "Shiv Sagar Dhaba", "Indian Oil Pump", "Coffee Day", "Police Post"]
+    
+    # Generate mock places relative to current location
+    for i in range(12):
+        name = random.choice(names)
+        # Small random offset for realistic coordinates
+        p_lat = lat + random.uniform(-0.05, 0.05)
+        p_lon = lon + random.uniform(-0.05, 0.05)
+        
         mock_places.append({
             "id": i,
-            "name": random.choice(names),
-            "distance": random.randint(1, 100),
-            "rating": round(random.uniform(2.0, 5.0), 1)
+            "name": f"{name} {i+1}",
+            "distance": round(random.uniform(0.5, 15.0), 1),
+            "rating": round(random.uniform(3.0, 5.0), 1),
+            "coords": [p_lat, p_lon]
         })
         
+    # Using QuickSort algorithm from services/sorting.py
     sorted_places = quick_sort_places(mock_places)
     return {
-        "places": sorted_places,
+        "places": sorted_places[:8], # Return top 8
         "label": "Top nearest recommended stops"
     }
