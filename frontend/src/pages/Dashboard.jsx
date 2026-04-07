@@ -17,11 +17,18 @@ import {
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, ChartTooltip);
 
-function MapMover({ center, zoom, heading }) {
+function MapMover({ center, zoom, heading, isSimulating }) {
   const map = useMap();
   useEffect(() => {
-    map.setView(center, zoom, { animate: true });
-  }, [center, zoom, map]);
+    if (isSimulating) {
+        // While simulating, just silently pan to the new center to track the rider
+        // without overriding the user's manual zoom level!
+        map.panTo(center, { animate: true, duration: 1 });
+    } else {
+        // When not simulating (initial load or planning), set full view
+        map.setView(center, zoom, { animate: true });
+    }
+  }, [center, zoom, map, isSimulating]);
   return null;
 }
 
@@ -381,15 +388,18 @@ function Dashboard() {
   };
 
   const isLight = theme === 'light';
-  const bgC = isLight ? 'bg-gray-100' : 'bg-gray-900';
+  const bgC = isLight ? 'bg-gradient-to-br from-blue-50 via-white to-purple-50' : 'bg-gradient-to-br from-slate-900 via-purple-950 to-black';
   const textC = isLight ? 'text-gray-900' : 'text-gray-100';
-  const panelBg = isLight ? 'bg-white/90 border-gray-200' : 'bg-gray-800/90 border-gray-700';
+  const panelBg = isLight ? 'bg-white/50 border-white/50 backdrop-blur-xl' : 'bg-black/40 border-purple-500/30 backdrop-blur-xl';
 
   return (
     <div className={`h-screen ${bgC} ${textC} flex flex-col overflow-hidden transition-colors duration-500`}>
-      <header className={`${panelBg} border-b p-4 shrink-0 flex justify-between items-center backdrop-blur-md z-50`}>
+      <header className={`${panelBg} border-b shadow-lg p-4 shrink-0 flex justify-between items-center backdrop-blur-md z-50`}>
         <div className="flex items-center">
-          <h1 className="text-xl font-bold font-mono text-neonBlue mr-6">RIDER<span className="text-neonOrange">INTEL</span></h1>
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-neonBlue to-neonOrange mr-3 flex items-center justify-center shadow-[0_0_15px_rgba(0,243,255,0.4)]">
+             <Navigation className="text-white w-6 h-6" />
+          </div>
+          <h1 className="text-2xl font-black font-mono bg-clip-text text-transparent bg-gradient-to-r from-neonBlue to-neonOrange mr-6">RIDER<span className="text-white">INTEL</span></h1>
           <button onClick={locateMe} className="text-gray-500 hover:text-neonBlue flex items-center">
             <MapPin className="w-5 h-5 mr-1" /> Locate
           </button>
@@ -520,7 +530,7 @@ function Dashboard() {
           </div>
 
           <MapContainer center={currentLocation} zoom={15} zoomControl={false} className="flex-1 w-full bg-[#1a1c23]" style={{ height: '100%', minHeight: '400px' }}>
-            <MapMover center={currentLocation} zoom={isSimulating ? 16 : 14} heading={heading} />
+            <MapMover center={currentLocation} zoom={isSimulating ? 16 : 14} heading={heading} isSimulating={isSimulating} />
             <TileLayer
               url={isLight ? "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"}
             />
