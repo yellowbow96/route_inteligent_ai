@@ -507,10 +507,10 @@ function Dashboard() {
 
           <div className="absolute top-4 left-4 right-4 z-[400] grid grid-cols-2 lg:grid-cols-4 gap-4 pointer-events-none">
              {[
-               { icon: <Gauge/>, title: 'SPEED', val: `${speed.toFixed(0)}`, unit: 'km/h', color: getSpeedColor() },
-               { icon: <MapPin/>, title: 'TRIP', val: `${distance.toFixed(1)}`, unit: 'km', color: '#fff' },
-               { icon: <DollarSign/>, title: 'COST', val: `₹${(fuelUsed * fuelPrice).toFixed(0)}`, unit: '', color: '#fff' },
-               { icon: <Fuel/>, title: 'FUEL REM', val: `${remainingFuel}`, unit: 'L', color: '#ff6b00' },
+               { icon: <Gauge/>, title: 'SPEED', val: `${(speed || 0).toFixed(0)}`, unit: 'km/h', color: getSpeedColor() },
+               { icon: <MapPin/>, title: 'TRIP', val: `${(distance || 0).toFixed(1)}`, unit: 'km', color: '#fff' },
+               { icon: <DollarSign/>, title: 'COST', val: `₹${((fuelUsed || 0) * (fuelPrice || 0)).toFixed(0)}`, unit: '', color: '#fff' },
+               { icon: <Fuel/>, title: 'FUEL REM', val: `${remainingFuel || 0}`, unit: 'L', color: '#ff6b00' },
              ].map((m, i) => (
                 <div key={i} className={`pointer-events-auto backdrop-blur-xl ${isLight?'bg-white/80 border-gray-200':'bg-gray-900/80 border-gray-700'} border rounded-xl p-3 shadow-2xl transition-all duration-300`}>
                   <p className="text-[10px] font-bold opacity-60 flex items-center mb-1">{React.cloneElement(m.icon, {className:"w-3 h-3 mr-1"})} {m.title}</p>

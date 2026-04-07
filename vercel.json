@@ -11,14 +11,10 @@
       "config": { "distDir": "dist" }
     }
   ],
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/fastapi_backend/main.py"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/fastapi_backend/main.py" },
+    { "src": "/(.*)", "dest": "/$1" },
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
