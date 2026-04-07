@@ -1,6 +1,5 @@
 {
   "version": 2,
-  "name": "rider-intelligence-v3",
   "builds": [
     {
       "src": "fastapi_backend/main.py",
@@ -9,23 +8,17 @@
     {
       "src": "frontend/package.json",
       "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
+      "config": { "distDir": "dist" }
     }
   ],
-  "routes": [
+  "rewrites": [
     {
-      "src": "/api/(.*)",
-      "dest": "fastapi_backend/main.py"
+      "source": "/api/(.*)",
+      "destination": "/fastapi_backend/main.py"
     },
     {
-      "src": "/test/(.*)",
-      "dest": "fastapi_backend/main.py"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/frontend/$1"
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
