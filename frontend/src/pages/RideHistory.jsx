@@ -96,8 +96,8 @@ function RideHistory() {
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-sm text-gray-400">
-                  <div className="flex items-center"><MapPin className="w-3 h-3 mr-1" /> {ride.distance.toFixed(1)} km</div>
-                  <div className="flex items-center"><TrendingUp className="w-3 h-3 mr-1" /> {ride.average_speed.toFixed(1)} km/h</div>
+                  <div className="flex items-center"><MapPin className="w-3 h-3 mr-1" /> {(ride.distance || 0).toFixed(1)} km</div>
+                  <div className="flex items-center"><TrendingUp className="w-3 h-3 mr-1" /> {(ride.average_speed || 0).toFixed(1)} km/h</div>
                 </div>
               </div>
             ))}

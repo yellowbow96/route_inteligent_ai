@@ -7,7 +7,7 @@ import 'leaflet/dist/leaflet.css';
 import {
   Activity, MapPin, Gauge, Timer, Fuel, AlertTriangle,
   Search, Navigation, DollarSign, Settings, PhoneCall,
-  Sun, Moon
+  Sun, Moon, TrendingUp
 } from 'lucide-react';
 import L from 'leaflet';
 import { Line } from 'react-chartjs-2';
@@ -82,6 +82,7 @@ function Dashboard() {
   const [routeGeoPath, setRouteGeoPath] = useState([]);
   const [totalRouteDistance, setTotalRouteDistance] = useState(0);
   const [plannedStops, setPlannedStops] = useState([]);
+  const [nearbyPOIs, setNearbyPOIs] = useState([]);
 
   const trackerRef = useRef(null);
   const pathIndexRef = useRef(0);
@@ -150,9 +151,29 @@ function Dashboard() {
     }
   };
 
+  const fetchNearbyPOIs = async () => {
+    try {
+      addAlert("🔍 Ranking nearby locations...");
+      const res = await axios.post('/api/proxy/pois/', { lat: currentLocation[0], lon: currentLocation[1] });
+      if (res.data && Array.isArray(res.data.places)) {
+        setNearbyPOIs(res.data.places);
+        addAlert(`✨ ${res.data.label} (Quick Sort applied)`);
+      } else {
+        setNearbyPOIs([]);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const calculateFuel = (distKm, currentSpeed) => {
     if (!bike) return 0;
-    const eff = (1500 / (bike.engine_cc || 150)) * ((bike.wheel_diameter || 17) / (bike.weight || 150)) * 100;
+    const engineCc = parseInt(bike.engine_cc) || 150;
+    const wheelDia = parseInt(bike.wheel_diameter) || 17;
+    const weightKg = parseInt(bike.weight) || 150;
+    
+    const eff = (1500 / engineCc) * (wheelDia / weightKg) * 100;
+    if (!isFinite(eff) || eff === 0) return 0;
     
     // Mode modifiers
     let modeMult = 1.0;
@@ -210,6 +231,10 @@ function Dashboard() {
       setRouteGeoPath(coords);
       setTotalRouteDistance(dist);
       setCurrentLocation(coords[0]);
+      
+      if (routeRes.data.features[0].properties.dijkstraLabel) {
+        addAlert(`🧠 ${routeRes.data.features[0].properties.dijkstraLabel}`);
+      }
 
       // Calculate stops
       const engineCc = bike ? parseInt(bike.engine_cc) : 150;
@@ -217,7 +242,9 @@ function Dashboard() {
       const weightKg = bike ? parseInt(bike.weight) : 150;
       const tankCap = bike ? parseInt(bike.tank_capacity) : 10;
 
-      const eff = (1500 / engineCc) * (wheelDia / weightKg) * 100;
+      // Real-world Physics based Efficiency Formula (Realistic for MCA project)
+      // Base: 150cc bike @ 150kg ≈ 45-50 km/L
+      const eff = (7500 / engineCc) * (150 / weightKg) * (wheelDia / 17);
       let maxRange = tankCap * eff;
       if (rideMode === 'Eco') maxRange *= 1.2;
       if (rideMode === 'Sport') maxRange *= 0.8;
@@ -287,9 +314,13 @@ function Dashboard() {
       if (pathIndexRef.current < routeGeoPath.length) {
         const p1 = routeGeoPath[pathIndexRef.current - 1];
         const p2 = routeGeoPath[pathIndexRef.current];
-        // Calculate bearing for icon rotation
-        const y = Math.sin(p2[1]-p1[1]) * Math.cos(p2[0]);
-        const x = Math.cos(p1[0])*Math.sin(p2[0]) - Math.sin(p1[0])*Math.cos(p2[0])*Math.cos(p2[1]-p1[1]);
+        
+        // Accurate Bearing Calculation for icon rotation
+        const lat1 = p1[0] * Math.PI / 180;
+        const lat2 = p2[0] * Math.PI / 180;
+        const dLon = (p2[1] - p1[1]) * Math.PI / 180;
+        const y = Math.sin(dLon) * Math.cos(lat2);
+        const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
         const bear = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
         setHeading(bear);
         
@@ -341,7 +372,7 @@ function Dashboard() {
     }
   };
 
-  const remainingFuel = bike ? Math.max(0, bike.tank_capacity - fuelUsed).toFixed(1) : 0;
+  const remainingFuel = (bike && bike.tank_capacity) ? Math.max(0, bike.tank_capacity - fuelUsed).toFixed(1) : 0;
   
   const getSpeedColor = () => {
     if (speed < 50) return '#10b981'; // green
@@ -361,6 +392,9 @@ function Dashboard() {
           <h1 className="text-xl font-bold font-mono text-neonBlue mr-6">RIDER<span className="text-neonOrange">INTEL</span></h1>
           <button onClick={locateMe} className="text-gray-500 hover:text-neonBlue flex items-center">
             <MapPin className="w-5 h-5 mr-1" /> Locate
+          </button>
+          <button onClick={fetchNearbyPOIs} className="text-gray-500 hover:text-neonBlue flex items-center">
+            <Search className="w-5 h-5 mr-1" /> Rank POIs
           </button>
           <button onClick={() => setTheme(isLight ? 'dark' : 'light')} className="text-gray-500 hover:text-neonBlue">
             {isLight ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5"/>}
@@ -428,6 +462,21 @@ function Dashboard() {
           <div className="p-5 flex-1 flex flex-col min-h-[200px]">
              <h3 className="text-xs font-bold opacity-70 mb-3 flex justify-between">UPCOMING STOPS <span>{plannedStops.length}</span></h3>
              <div className="flex-1 overflow-y-auto space-y-2 pr-2">
+                {nearbyPOIs.length > 0 && (
+                  <div className={`p-3 rounded-xl border mb-4 ${isLight?'bg-blue-50 border-blue-100':'bg-blue-500/10 border-blue-500/20'}`}>
+                    <h3 className="text-[10px] font-black uppercase tracking-widest mb-2 flex items-center text-blue-400">
+                      <Activity className="w-3 h-3 mr-2"/> Ranked Locations
+                    </h3>
+                    <div className="space-y-1.5">
+                      {nearbyPOIs.map((poi, idx) => (
+                        <div key={idx} className="flex justify-between items-center text-[10px]">
+                          <span className={`${isLight?'text-gray-700':'text-white'} opacity-80`}>{poi.name}</span>
+                          <span className="font-mono text-blue-400 font-bold">{poi.distance} km</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {plannedStops.map((stop, i) => (
                   <div key={i} className={`p-2 rounded border flex items-center space-x-3 ${stop.type === 'Fuel' ? (isLight?'bg-orange-50 border-orange-200 text-orange-600':'bg-neonOrange/10 border-neonOrange/30 text-neonOrange') : (isLight?'bg-blue-50 border-blue-200 text-blue-600':'bg-neonBlue/10 border-neonBlue/30 text-neonBlue')}`}>
                      {stop.type === 'Fuel' ? <Fuel className="w-4 h-4" /> : <Timer className="w-4 h-4" />}
