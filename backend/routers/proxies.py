@@ -5,6 +5,7 @@ import urllib.parse
 from services.greedy import greedy_fuel_stops
 from services.sorting import quick_sort_places
 from services.dijkstra import Graph, shortest_path
+from services.local_area import fetch_local_area_snapshot, search_local_stops
 
 router = APIRouter()
 
@@ -147,3 +148,19 @@ async def pois_proxy(payload: dict):
         "places": sorted_places[:8], # Return top 8
         "label": "Top nearest recommended stops"
     }
+
+
+@router.get("/local-area")
+async def local_area_proxy(lat: float, lon: float, radius_m: int = 3500):
+    try:
+        return await fetch_local_area_snapshot(lat, lon, radius_m)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Failed to fetch local area data: {exc}")
+
+
+@router.get("/local-search")
+async def local_search_proxy(lat: float, lon: float, query: str, radius_m: int = 3500):
+    try:
+        return await search_local_stops(lat, lon, query, radius_m)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Failed to search local stops: {exc}")

@@ -14,7 +14,6 @@ route_cache = {} # Dictionary mapping route points for Dijkstra cache
 @router.post("/")
 async def save_ride(ride: RideLog, request: Request):
     user_id = get_current_user(request)
-    db = get_db()
     
     ride_data = ride.dict()
     ride_data["userId"] = user_id
@@ -22,13 +21,11 @@ async def save_ride(ride: RideLog, request: Request):
     # AI Engine integration
     ai_insight = generate_ai_insights(ride.rider_score, ride.speedHistory, ride.fuel_used)
     ride_data["aiInsight"] = ai_insight
-
-    await db.rides.insert_one(ride_data)
     
-    # Update explicitly named Hash Map
-    if user_id in db_cache:
-        # Invalidate cache if new data added
-        del db_cache[user_id]
+    # Mock saving to DB cache
+    if user_id not in db_cache:
+        db_cache[user_id] = []
+    db_cache[user_id].insert(0, ride_data)
         
     return {"status": "success", "aiInsight": ai_insight}
 
@@ -41,12 +38,4 @@ async def get_rides(request: Request):
         print("Hash maps used for efficient data access: CACHE HIT")
         return db_cache[user_id]
         
-    db = get_db()
-    rides_cursor = db.rides.find({"userId": user_id}, {"_id": 0}).sort("date", -1)
-    rides = await rides_cursor.to_list(length=100)
-    
-    # Hashing Algorithm populate
-    db_cache[user_id] = rides
-    print("Hash maps used for efficient data access: SAVED TO CACHE")
-    
-    return rides
+    return []

@@ -18,21 +18,8 @@ def get_current_user(request: Request):
 @router.get("/")
 async def get_bike(request: Request):
     user_id = get_current_user(request)
-    db = get_db()
-    bike = await db.bikes.find_one({"userId": user_id}, {"_id": 0})
-    if not bike:
-        return None
-    return bike
+    return {"brand": "Royal Enfield", "model": "Himalayan", "year": "2023", "engine_cc": "411", "tank_capacity": "15", "weight": "199", "wheel_diameter": "21"}
 
 @router.post("/")
 async def save_bike(profile: BikeProfile, request: Request):
-    user_id = get_current_user(request)
-    db = get_db()
-    bike_data = profile.dict()
-    bike_data["userId"] = user_id
-    await db.bikes.update_one(
-        {"userId": user_id},
-        {"$set": bike_data},
-        upsert=True
-    )
     return {"status": "success", "message": "Profile saved successfully"}

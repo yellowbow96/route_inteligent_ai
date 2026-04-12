@@ -7,6 +7,7 @@ import RideSummary from './pages/RideSummary';
 import RideHistory from './pages/RideHistory';
 import BikeProfile from './pages/BikeProfile';
 import SystemDesign from './pages/SystemDesign';
+import GroupLive from './pages/GroupLive';
 
 const ProtectedRoute = ({ children }) => {
   const { token } = useAuth();
@@ -24,6 +25,7 @@ function App() {
         <Route path="/summary" element={<ProtectedRoute><RideSummary /></ProtectedRoute>} />
         <Route path="/history" element={<ProtectedRoute><RideHistory /></ProtectedRoute>} />
         <Route path="/design" element={<SystemDesign />} />
+        <Route path="/live/:code" element={<GroupLive />} />
       </Routes>
     </div>
   );

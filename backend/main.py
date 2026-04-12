@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import auth, bike, ride, proxies
+from routers import auth, bike, ride, proxies, group
 
 app = FastAPI(title="Rider Intelligence V3 API")
 
@@ -16,6 +16,7 @@ app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(bike.router, prefix="/api/bike", tags=["Bike"])
 app.include_router(ride.router, prefix="/api/rides", tags=["Rides"])
 app.include_router(proxies.router, prefix="/api/proxy", tags=["Proxies"])
+app.include_router(group.router, prefix="/api/group", tags=["Group Ride"])
 
 @app.get("/")
 def read_root():
