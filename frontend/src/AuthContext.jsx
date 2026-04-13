@@ -29,15 +29,17 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('username', username);
   };
 
-  const register = async (username, password, fullName) => {
+  const register = async (username, password, fullName, email) => {
     const res = await axios.post(`${API_BASE}/api/auth/register/`, { username, password, full_name: fullName });
     setToken(res.data.token);
     localStorage.setItem('username', username);
+    if (email) localStorage.setItem('email', email);
   };
 
   const logout = () => {
     setToken(null);
     localStorage.removeItem('username');
+    localStorage.removeItem('email');
   };
 
   return (

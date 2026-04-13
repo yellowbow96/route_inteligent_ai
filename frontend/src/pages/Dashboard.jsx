@@ -8,15 +8,32 @@ import {
   Activity, MapPin, Gauge, Timer, Fuel, AlertTriangle,
   Search, Navigation, DollarSign, Settings, PhoneCall,
   Sun, Moon, Sparkles, Trees, Store, Coffee, ShieldPlus,
-  Users, Copy, Radio, Mic, Share2, LocateFixed, Phone
+  Users, Copy, Radio, Mic, Share2, LocateFixed, Phone, Trophy, Bike, PencilLine, X
 } from 'lucide-react';
 import L from 'leaflet';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip as ChartTooltip
 } from 'chart.js';
+import BikeProfileForm from '../components/BikeProfileForm';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, ChartTooltip);
+
+const emptyBikeProfile = {
+  model_name: '',
+  engine_cc: '',
+  weight: '',
+  wheel_diameter: '',
+  tank_capacity: ''
+};
+
+const normalizeBikeProfile = (data = {}) => ({
+  model_name: data.model_name || [data.brand, data.model, data.year].filter(Boolean).join(' ') || '',
+  engine_cc: data.engine_cc?.toString?.() || '',
+  weight: data.weight?.toString?.() || '',
+  wheel_diameter: data.wheel_diameter?.toString?.() || '',
+  tank_capacity: data.tank_capacity?.toString?.() || ''
+});
 
 function MapMover({ center, zoom, heading, isSimulating, recenterTick }) {
   const map = useMap();
@@ -87,6 +104,12 @@ function Dashboard() {
   const [speedHistory, setSpeedHistory] = useState([]); // [{time, speed, event}]
   const [showSOS, setShowSOS] = useState(false);
   const [hudPopover, setHudPopover] = useState(null);
+  const [showRideRankPanel, setShowRideRankPanel] = useState(false);
+  const [showBikeChooser, setShowBikeChooser] = useState(false);
+  const [showBikeEditor, setShowBikeEditor] = useState(false);
+  const [bikeDraft, setBikeDraft] = useState(emptyBikeProfile);
+  const [bikeFormMessage, setBikeFormMessage] = useState('');
+  const [lastRideSummary, setLastRideSummary] = useState(null);
 
   const [startQuery, setStartQuery] = useState('');
   const [endQuery, setEndQuery] = useState('');
@@ -113,6 +136,8 @@ function Dashboard() {
   const pathIndexRef = useRef(0);
   const speechRecognitionRef = useRef(null);
   const remainingFuelValue = (bike && bike.tank_capacity) ? Math.max(0, bike.tank_capacity - fuelUsed).toFixed(1) : 0;
+  const liveRideScore = Math.max(0, (rideMode === 'Sport' ? 95 : 100) - (alerts.length * 5));
+  const displayedRideScore = lastRideSummary?.score ?? liveRideScore;
 
   // Auto layout theme based on time
   useEffect(() => {
@@ -123,10 +148,10 @@ function Dashboard() {
     // Fetch Bike Profile
     axios.get('/api/bike/')
       .then(res => { 
-        if (res.data) setBike(res.data); 
-        else navigate('/profile'); 
+        if (res.data) setBike(normalizeBikeProfile(res.data));
+        else setBike(null);
       })
-      .catch(() => navigate('/profile'));
+      .catch(() => setBike(null));
 
     // GPS Geolocation
     if ("geolocation" in navigator) {
@@ -160,6 +185,36 @@ function Dashboard() {
     }, 6000);
     return () => clearInterval(timer);
   }, [activeGroup?.code]);
+
+  const openBikeChooser = () => {
+    setBikeDraft(normalizeBikeProfile(bike || emptyBikeProfile));
+    setBikeFormMessage('');
+    setShowBikeEditor(!bike?.model_name);
+    setShowBikeChooser(true);
+  };
+
+  const saveBikeProfile = async (e) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        model_name: bikeDraft.model_name,
+        engine_cc: parseInt(bikeDraft.engine_cc, 10),
+        weight: parseInt(bikeDraft.weight, 10),
+        wheel_diameter: parseInt(bikeDraft.wheel_diameter, 10),
+        tank_capacity: parseInt(bikeDraft.tank_capacity, 10)
+      };
+
+      await axios.post('/api/bike/', payload);
+      const normalized = normalizeBikeProfile(bikeDraft);
+      setBike(normalized);
+      setBikeDraft(normalized);
+      setBikeFormMessage('Bike profile saved. You can use it for this ride.');
+      setShowBikeEditor(false);
+    } catch (err) {
+      console.error(err);
+      setBikeFormMessage('Could not save bike profile. Check the numbers and try again.');
+    }
+  };
 
   const locateMe = () => {
     if ("geolocation" in navigator) {
@@ -493,10 +548,13 @@ function Dashboard() {
     }
   };
 
-  const startSimulation = () => {
+  const beginRideSimulation = () => {
     if (isSimulating) return;
     if (routeGeoPath.length === 0) return alert("Please plan a route first!");
 
+    setShowBikeChooser(false);
+    setShowBikeEditor(false);
+    setShowRideRankPanel(false);
     setIsSimulating(true);
     setDistance(0); setDuration(0); setFuelUsed(0);
     pathIndexRef.current = 0;
@@ -562,6 +620,20 @@ function Dashboard() {
     }, 1000);
   };
 
+  const handleStartRide = () => {
+    if (isSimulating) {
+      stopSimulation();
+      return;
+    }
+
+    if (routeGeoPath.length === 0) {
+      alert("Please plan a route first!");
+      return;
+    }
+
+    openBikeChooser();
+  };
+
   const stopSimulation = async () => {
     setIsSimulating(false);
     clearInterval(trackerRef.current);
@@ -582,7 +654,10 @@ function Dashboard() {
     try {
       const res = await axios.post('/api/rides/', rideData);
       const backendAiInsight = res.data.aiInsight || aiInsight;
-      navigate('/summary', { state: { ...rideData, score, aiInsight: backendAiInsight, tripCost, speedHistory } });
+      const summary = { ...rideData, score, aiInsight: backendAiInsight, tripCost, speedHistory };
+      setLastRideSummary(summary);
+      setShowRideRankPanel(true);
+      addAlert(`🏁 Ride complete. Score ${score} ready in Ride Rank.`);
     } catch(err) {
       alert('Failed to save ride');
     }
@@ -623,6 +698,8 @@ function Dashboard() {
     : 'bg-gray-900/80 border-gray-700 text-gray-100';
   const metricValueColor = isLight ? '#0f172a' : '#ffffff';
   const tabButton = (tab) => utilityTab === tab ? selectedModeButton : ghostButton;
+  const rideRankTone = displayedRideScore >= 85 ? 'text-emerald-400' : displayedRideScore >= 65 ? 'text-cyan-300' : 'text-orange-300';
+  const rideRankLabel = displayedRideScore >= 85 ? 'Smooth control' : displayedRideScore >= 65 ? 'Stable ride' : 'Needs cleanup';
   const renderUtilityPanel = () => {
     if (utilityTab === 'plan') {
       return (
@@ -876,6 +953,9 @@ function Dashboard() {
              <span className="text-[10px] font-bold opacity-50 uppercase tracking-widest">Active Rider</span>
              <span className={`text-sm font-black ${isLight ? 'text-slate-900' : 'text-white'}`}>{localStorage.getItem('username') || 'Tester'}</span>
           </div>
+          <button onClick={() => setShowRideRankPanel(true)} className={`flex items-center rounded-full px-3 py-2 font-semibold transition-colors ${navButton}`}>
+            <Trophy className="w-4 h-4 mr-2" /> Ride Rank
+          </button>
           <button onClick={() => setShowSOS(true)} className="flex items-center text-red-500 font-bold bg-red-500/10 px-3 py-1 rounded-full hover:bg-red-500/20 animate-pulse">
             <PhoneCall className="w-4 h-4 mr-2" /> SOS
           </button>
@@ -957,11 +1037,23 @@ function Dashboard() {
            </div>
           
           <div className={`p-5 border-t sticky bottom-0 ${isLight ? 'border-slate-200/90 bg-white/90' : 'border-gray-700/50 bg-slate-950/85'} backdrop-blur-xl`}>
+            <div className={`mb-3 rounded-2xl border px-4 py-3 ${isLight ? 'border-slate-200 bg-slate-50' : 'border-white/10 bg-white/5'}`}>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className={`text-[10px] font-black uppercase tracking-[0.22em] ${mutedText}`}>Ride Rank</div>
+                  <div className={`text-2xl font-black ${rideRankTone}`}>{displayedRideScore}</div>
+                </div>
+                <button onClick={() => setShowRideRankPanel(true)} className={`rounded-full px-3 py-2 text-xs font-bold ${ghostButton}`}>
+                  Check score
+                </button>
+              </div>
+              <div className={`mt-2 text-xs ${mutedText}`}>{lastRideSummary ? 'Last ride summary is ready.' : `Live estimate: ${rideRankLabel}.`}</div>
+            </div>
             <button 
-              onClick={isSimulating ? stopSimulation : startSimulation}
+              onClick={handleStartRide}
               className={`w-full py-3 rounded-xl font-black transition-transform active:scale-95 shadow-lg ${isSimulating ? 'bg-red-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.5)]' : isLight ? 'bg-sky-600 text-white shadow-[0_12px_30px_rgba(2,132,199,0.32)] hover:bg-sky-700' : 'bg-neonBlue text-gray-900 shadow-[0_0_20px_rgba(0,243,255,0.4)]'}`}
             >
-              {isSimulating ? 'END RIDE & VIEW SUMMARY' : 'START RIDE'}
+              {isSimulating ? 'END RIDE' : 'START RIDE'}
             </button>
           </div>
         </aside>
@@ -1051,6 +1143,154 @@ function Dashboard() {
           </div>
         ))}
       </div>
+
+      {showRideRankPanel && (
+        <div className="fixed inset-0 z-[1320] bg-black/50 backdrop-blur-sm">
+          <div className={`absolute right-0 top-0 h-full w-full max-w-md border-l p-6 shadow-2xl ${panelBg}`}>
+            <div className="mb-6 flex items-start justify-between gap-4">
+              <div>
+                <div className={`text-[11px] font-black uppercase tracking-[0.24em] ${mutedText}`}>Ride Rank</div>
+                <div className={`mt-2 text-5xl font-black ${rideRankTone}`}>{displayedRideScore}</div>
+                <div className={`mt-2 text-sm ${mutedText}`}>{lastRideSummary ? 'Last completed ride' : 'Live score estimate while planning or riding'}</div>
+              </div>
+              <button onClick={() => setShowRideRankPanel(false)} className={`rounded-full p-2 ${ghostButton}`}>
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 mb-6">
+              {[
+                { label: 'Mode', value: rideMode },
+                { label: 'Alerts', value: alerts.length },
+                { label: 'Status', value: rideRankLabel },
+              ].map((item) => (
+                <div key={item.label} className={`rounded-2xl border p-3 ${isLight ? 'border-slate-200 bg-white/80' : 'border-white/10 bg-white/5'}`}>
+                  <div className={`text-[10px] font-black uppercase tracking-[0.22em] ${mutedText}`}>{item.label}</div>
+                  <div className={`mt-2 text-sm font-bold ${subtleText}`}>{item.value}</div>
+                </div>
+              ))}
+            </div>
+
+            {lastRideSummary ? (
+              <div className={`rounded-3xl border p-5 ${isLight ? 'border-slate-200 bg-white/80' : 'border-white/10 bg-black/20'}`}>
+                <div className="mb-4 flex items-center gap-2 text-sm font-bold">
+                  <Trophy className="w-4 h-4 text-neonOrange" /> Last ride snapshot
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <div className={mutedText}>Distance</div>
+                    <div className="font-bold">{lastRideSummary.distance.toFixed(1)} km</div>
+                  </div>
+                  <div>
+                    <div className={mutedText}>Avg speed</div>
+                    <div className="font-bold">{lastRideSummary.average_speed.toFixed(1)} km/h</div>
+                  </div>
+                  <div>
+                    <div className={mutedText}>Fuel used</div>
+                    <div className="font-bold">{lastRideSummary.fuel_used.toFixed(2)} L</div>
+                  </div>
+                  <div>
+                    <div className={mutedText}>Trip cost</div>
+                    <div className="font-bold">₹{lastRideSummary.tripCost.toFixed(0)}</div>
+                  </div>
+                </div>
+                <p className={`mt-4 text-sm leading-6 ${mutedText}`}>{lastRideSummary.aiInsight}</p>
+                <div className="mt-5 grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => navigate('/summary', { state: lastRideSummary })}
+                    className={`rounded-2xl px-4 py-3 text-sm font-black ${primaryButton}`}
+                  >
+                    Open full report
+                  </button>
+                  <button
+                    onClick={() => navigate('/history')}
+                    className={`rounded-2xl px-4 py-3 text-sm font-black ${ghostButton}`}
+                  >
+                    Ride history
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className={`rounded-3xl border border-dashed p-5 text-sm leading-7 ${isLight ? 'border-slate-300 bg-slate-50 text-slate-700' : 'border-white/10 bg-black/20 text-gray-300'}`}>
+                Finish a ride to keep the full report here. Until then this panel works like a quick rank card instead of forcing a full-screen summary.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {showBikeChooser && (
+        <div className="fixed inset-0 z-[1310] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm">
+          <div className={`${panelBg} w-full max-w-2xl rounded-[28px] border p-6 shadow-2xl`}>
+            <div className="mb-6 flex items-start justify-between gap-4">
+              <div>
+                <div className={`text-[11px] font-black uppercase tracking-[0.24em] ${mutedText}`}>Before ride start</div>
+                <h2 className="mt-2 text-2xl font-black">Choose bike profile</h2>
+                <p className={`mt-2 text-sm ${mutedText}`}>When you start from the map, use the saved bike or switch to a new one for this ride.</p>
+              </div>
+              <button onClick={() => setShowBikeChooser(false)} className={`rounded-full p-2 ${ghostButton}`}>
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {!showBikeEditor && bike?.model_name && (
+              <div className={`mb-5 rounded-3xl border p-5 ${isLight ? 'border-slate-200 bg-white/80' : 'border-white/10 bg-black/20'}`}>
+                <div className="mb-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`flex h-11 w-11 items-center justify-center rounded-2xl ${isLight ? 'bg-slate-900 text-cyan-200' : 'bg-cyan-400/15 text-cyan-200'}`}>
+                      <Bike className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-lg font-black">{bike.model_name}</div>
+                      <div className={`text-xs ${mutedText}`}>Saved profile</div>
+                    </div>
+                  </div>
+                  <button onClick={() => setShowBikeEditor(true)} className={`rounded-full px-3 py-2 text-xs font-bold ${ghostButton}`}>
+                    <PencilLine className="mr-2 inline h-4 w-4" />
+                    New profile
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className={`rounded-2xl border p-3 ${isLight ? 'border-slate-200 bg-slate-50' : 'border-white/10 bg-white/5'}`}>Engine: <span className="font-bold">{bike.engine_cc} cc</span></div>
+                  <div className={`rounded-2xl border p-3 ${isLight ? 'border-slate-200 bg-slate-50' : 'border-white/10 bg-white/5'}`}>Weight: <span className="font-bold">{bike.weight} kg</span></div>
+                  <div className={`rounded-2xl border p-3 ${isLight ? 'border-slate-200 bg-slate-50' : 'border-white/10 bg-white/5'}`}>Wheel: <span className="font-bold">{bike.wheel_diameter}"</span></div>
+                  <div className={`rounded-2xl border p-3 ${isLight ? 'border-slate-200 bg-slate-50' : 'border-white/10 bg-white/5'}`}>Tank: <span className="font-bold">{bike.tank_capacity} L</span></div>
+                </div>
+
+                <button onClick={beginRideSimulation} className={`mt-5 w-full rounded-2xl px-4 py-3 text-sm font-black ${primaryButton}`}>
+                  Start with saved profile
+                </button>
+              </div>
+            )}
+
+            {(showBikeEditor || !bike?.model_name) && (
+              <div className={`rounded-3xl border p-5 ${isLight ? 'border-slate-200 bg-white/80' : 'border-white/10 bg-black/20'}`}>
+                <div className="mb-4 flex items-center justify-between">
+                  <div>
+                    <div className="text-lg font-black">{bike?.model_name ? 'Create another bike profile' : 'Create your first bike profile'}</div>
+                    <div className={`text-xs ${mutedText}`}>Save it here, then continue the ride.</div>
+                  </div>
+                  {bike?.model_name && (
+                    <button onClick={() => setShowBikeEditor(false)} className={`rounded-full px-3 py-2 text-xs font-bold ${ghostButton}`}>
+                      Use saved instead
+                    </button>
+                  )}
+                </div>
+
+                <BikeProfileForm
+                  profile={bikeDraft}
+                  onChange={setBikeDraft}
+                  onSubmit={saveBikeProfile}
+                  submitLabel="Save bike profile"
+                  message={bikeFormMessage}
+                  compact
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* SOS Modal */}
       {showSOS && (
